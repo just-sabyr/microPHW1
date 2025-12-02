@@ -48,17 +48,22 @@ my_MergeSort PROC
 
     ; Recursive call: my_MergeSort(start, mid)
     MOVS R4, R1            ; Save end index in R4
+    MOVS R5, R3            ; Save mid index in R5
     MOVS R1, R3            ; Set end = mid
     BL my_MergeSort        ; Call my_MergeSort(start, mid)
 
     ; Recursive call: my_MergeSort(mid+1, end)
+    MOVS R0, R5            ; Set start = mid
+    ADDS R0, R0, #1        ; Set start = mid + 1
     MOVS R1, R4            ; Restore end index
-    ADDS R0, R3, #1        ; Set start = mid + 1
     BL my_MergeSort        ; Call my_MergeSort(mid+1, end)
 
     ; Merge the two halves
-    SUBS R0, R3, #1        ; Restore start index
-    BL my_Merge            ; Call my_Merge(start, mid, end)
+    SUBS R0, R5, #1        ; R0 = start index
+    MOVS R1, R5            ; R1 = mid index
+    MOVS R3, R2            ; R3 = base address (for my_Merge)
+    MOVS R2, R4            ; R2 = end index
+    BL my_Merge            ; Call my_Merge(start, mid, end, base_address)
 
 merge_sort_done
     POP {R4-R7, PC}        ; Restore registers and return
@@ -163,7 +168,7 @@ right_remain
     B right_remain
 
 merge_done
-    ADDS SP, SP, #8         ; Deallocate stack space
+    ADD SP, SP, #8         ; Deallocate stack space
     POP {R4-R7, PC}        ; Restore registers and return
     ENDP
 
