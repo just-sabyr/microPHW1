@@ -1,13 +1,10 @@
-AREA    MergeSort_M0, CODE, READONLY
+    AREA    MergeSort_M0, CODE, READONLY
         THUMB
         ENTRY
         ALIGN
         EXPORT  main
         EXPORT  my_MergeSort
         EXPORT  my_Merge
-
-        AREA    MergeSort_M0, DATA, READWRITE
-array   DCD     38, 27, 43, 10, 55  ; Prepopulate array with unsorted values
 
 main
     ; Copy values from R0-R4 to memory
@@ -19,8 +16,8 @@ main
     LDR R4, [R5, #16]       ; Load array[4] into R4 (55 / 0x37)
 
     ; Call my_MergeSort to sort the array
-    MOV R0, #0              ; Start index
-    MOV R1, #4              ; End index (4 elements)
+    MOVS R0, #0             ; Start index
+    MOVS R1, #4             ; End index (4 elements)
     LDR R2, =array          ; Base address of array
     BL my_MergeSort         ; Sort the array
 
@@ -50,12 +47,12 @@ my_MergeSort PROC
     ASRS R3, R3, #1        ; R3 = mid
 
     ; Recursive call: my_MergeSort(start, mid)
-    MOV R4, R1             ; Save end index in R4
-    MOV R1, R3             ; Set end = mid
+    MOVS R4, R1            ; Save end index in R4
+    MOVS R1, R3            ; Set end = mid
     BL my_MergeSort        ; Call my_MergeSort(start, mid)
 
     ; Recursive call: my_MergeSort(mid+1, end)
-    MOV R1, R4             ; Restore end index
+    MOVS R1, R4            ; Restore end index
     ADDS R0, R3, #1        ; Set start = mid + 1
     BL my_MergeSort        ; Call my_MergeSort(mid+1, end)
 
@@ -74,11 +71,12 @@ my_Merge PROC
 ; Output: Merged array in memory
 
     PUSH {R4-R7, LR}       ; Save registers and link register
+    SUB SP, SP, #8         ; Allocate 8 bytes on stack for temp storage
 
     ; Initialize pointers
-    MOV R4, R0             ; Left pointer = start
+    MOVS R4, R0            ; Left pointer = start
     ADDS R5, R1, #1        ; Right pointer = mid + 1
-    MOV R6, R0             ; Temp pointer = start
+    MOVS R6, R0            ; Temp pointer = start
 
 merge_loop
     ; Check if left pointer > mid
@@ -90,19 +88,38 @@ merge_loop
     BGT left_remain
 
     ; Compare elements at left and right pointers
-    LDR R7, [R3, R4, LSL #2] ; Load left element
-    LDR R0, [R3, R5, LSL #2] ; Load right element
-    CMP R7, R0
+    MOVS R7, R4            ; R7 = left index
+    LSLS R7, R7, #2        ; R7 = left index * 4
+    ADDS R7, R3, R7        ; R7 = address of left element
+    LDR R7, [R7]           ; Load left element into R7
+    STR R7, [SP, #0]       ; Save left element on stack
+    
+    MOVS R0, R5            ; R0 = right index
+    LSLS R0, R0, #2        ; R0 = right index * 4
+    ADDS R0, R3, R0        ; R0 = address of right element
+    LDR R0, [R0]           ; Load right element into R0
+    STR R0, [SP, #4]       ; Save right element on stack
+    
+    LDR R7, [SP, #0]       ; Load left element
+    CMP R7, R0             ; Compare left and right
     BLE copy_left
 
     ; Copy right element to temp
-    STR R0, [R3, R6, LSL #2]
+    MOVS R7, R6            ; R7 = temp index
+    LSLS R7, R7, #2        ; R7 = temp index * 4
+    ADDS R7, R3, R7        ; R7 = address of temp
+    LDR R0, [SP, #4]       ; Load right element
+    STR R0, [R7]           ; Store right element at temp
     ADDS R5, R5, #1        ; Increment right pointer
     B next_merge
 
 copy_left
     ; Copy left element to temp
-    STR R7, [R3, R6, LSL #2]
+    MOVS R0, R6            ; R0 = temp index
+    LSLS R0, R0, #2        ; R0 = temp index * 4
+    ADDS R0, R3, R0        ; R0 = address of temp
+    LDR R7, [SP, #0]       ; Load left element
+    STR R7, [R0]           ; Store left element at temp
     ADDS R4, R4, #1        ; Increment left pointer
 
 next_merge
@@ -113,8 +130,16 @@ left_remain
     ; Copy remaining left elements
     CMP R4, R1
     BGT merge_done
-    LDR R7, [R3, R4, LSL #2]
-    STR R7, [R3, R6, LSL #2]
+    MOVS R7, R4            ; R7 = left index
+    LSLS R7, R7, #2        ; R7 = left index * 4
+    ADDS R7, R3, R7        ; R7 = address of left element
+    LDR R7, [R7]           ; Load left element
+    
+    MOVS R0, R6            ; R0 = temp index
+    LSLS R0, R0, #2        ; R0 = temp index * 4
+    ADDS R0, R3, R0        ; R0 = address of temp
+    STR R7, [R0]           ; Store left element at temp
+    
     ADDS R4, R4, #1
     ADDS R6, R6, #1
     B left_remain
@@ -123,12 +148,26 @@ right_remain
     ; Copy remaining right elements
     CMP R5, R2
     BGT merge_done
-    LDR R0, [R3, R5, LSL #2]
-    STR R0, [R3, R6, LSL #2]
+    MOVS R7, R5            ; R7 = right index
+    LSLS R7, R7, #2        ; R7 = right index * 4
+    ADDS R7, R3, R7        ; R7 = address of right element
+    LDR R7, [R7]           ; Load right element
+    
+    MOVS R0, R6            ; R0 = temp index
+    LSLS R0, R0, #2        ; R0 = temp index * 4
+    ADDS R0, R3, R0        ; R0 = address of temp
+    STR R7, [R0]           ; Store right element at temp
+    
     ADDS R5, R5, #1
     ADDS R6, R6, #1
     B right_remain
 
 merge_done
+    ADDS SP, SP, #8         ; Deallocate stack space
     POP {R4-R7, PC}        ; Restore registers and return
     ENDP
+
+        AREA    MergeSort_Data, DATA, READWRITE
+array   DCD     38, 27, 43, 10, 55  ; Prepopulate array with unsorted values
+
+        END
