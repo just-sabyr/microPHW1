@@ -6,17 +6,32 @@ AREA    MergeSort_M0, CODE, READONLY
         EXPORT  my_MergeSort
         EXPORT  my_Merge
 
-main
-    ; Initialize registers with the unsorted array elements
-    LDR R0, =38 ; Load R0 with the first element
-    LDR R1, =27 ; Load R1 with the second element
-    LDR R2, =43 ; Load R2 with the third element
-    LDR R3, =10 ; Load R4 with the fourth element
-    LDR R4, =55 ; Load R5 with the fifth element
+        AREA    MergeSort_M0, DATA, READWRITE
+array   DCD     38, 27, 43, 10, 55  ; Prepopulate array with unsorted values
 
-		
-		
-stop    B       stop ; put breakpoint here to work
+main
+    ; Copy values from R0-R4 to memory
+    LDR R5, =array          ; Base address of array
+    LDR R0, [R5, #0]        ; Load array[0] into R0 (38 / 0x26)
+    LDR R1, [R5, #4]        ; Load array[1] into R1 (27 / 0x1B)
+    LDR R2, [R5, #8]        ; Load array[2] into R2 (43 / 0x2B)
+    LDR R3, [R5, #12]       ; Load array[3] into R3 (10 / 0x0A)
+    LDR R4, [R5, #16]       ; Load array[4] into R4 (55 / 0x37)
+
+    ; Call my_MergeSort to sort the array
+    MOV R0, #0              ; Start index
+    MOV R1, #4              ; End index (4 elements)
+    LDR R2, =array          ; Base address of array
+    BL my_MergeSort         ; Sort the array
+
+    ; Copy sorted values back to R0-R4
+    LDR R0, [R5, #0]        ; Load sorted array[0] into R0 (10 / 0x0A)
+    LDR R1, [R5, #4]        ; Load sorted array[1] into R1 (27 / 0x1B)
+    LDR R2, [R5, #8]        ; Load sorted array[2] into R2 (38 / 0x26)
+    LDR R3, [R5, #12]       ; Load sorted array[3] into R3 (43 / 0x2B)
+    LDR R4, [R5, #16]       ; Load sorted array[4] into R4 (55 / 0x37)
+
+stop    B       stop         ; Breakpoint to inspect sorted values
         ENDP
 
 my_MergeSort PROC
