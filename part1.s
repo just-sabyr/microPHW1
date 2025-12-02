@@ -76,100 +76,173 @@ MergeSort_End
 
 my_Merge PROC
     ; my_Merge(array_base in R7, p in R5, q in R0, r in R6)
-    PUSH {LR}       ; Save link register
-    PUSH {R0-R4}    ; Save registers that will be used as temps
+    PUSH {R4-R7, LR} ; Save registers
+    MOV R4, SP       ; R4 is Frame Pointer
 
-    ; int n1 = q - p + 1;
-    SUB R1, R0, R5  ; q - p
-    ADD R1, R1, #1  ; n1 = q - p + 1
+    ; Push arguments to stack to free registers and allow consistent access
+    ; PUSH {R0, R5, R6} -> Stack: [R0(q), R5(p), R6(r)] (Lowest reg to lowest addr)
+    ; Stack layout relative to R4:
+    ; [R4, #-4]  = R6 (r)
+    ; [R4, #-8]  = R5 (p)
+    ; [R4, #-12] = R0 (q)
+    PUSH {R0, R5, R6}
 
-    ; int n2 = r - q;
-    SUB R2, R6, R0  ; n2 = r - q
+    ; Calculate n1 = q - p + 1
+    LDR R0, [R4, #-12] ; q
+    LDR R1, [R4, #-8]  ; p
+    SUB R2, R0, R1
+    ADD R2, R2, #1     ; n1
 
-    ; Create temp arrays L and R on the stack
-    ; We need space for n1+n2 integers. Max is 5.
-    ; Let's reserve space for 5 integers for L and 5 for R for simplicity.
-    SUB SP, SP, #20 ; Allocate space for L (5 words)
-    MOV R3, SP      ; R3 points to L
-    SUB SP, SP, #20 ; Allocate space for R (5 words)
-    MOV R4, SP      ; R4 points to R
+    ; Calculate n2 = r - q
+    LDR R0, [R4, #-4]  ; r
+    LDR R1, [R4, #-12] ; q
+    SUB R3, R0, R1     ; n2
 
-    ; Copy data to temp arrays L[] and R[]
-    ; for (int i = 0; i < n1; i++) L[i] = arr[p + i];
-    MOV R8, #0      ; i = 0
+    ; Push n1, n2
+    ; PUSH {R2, R3} -> Stack: [R2(n1), R3(n2)]
+    ; [R4, #-16] = R3 (n2)
+    ; [R4, #-20] = R2 (n1)
+    PUSH {R2, R3}
+
+    ; Calculate size for L and R arrays: (n1 + n2) * 4
+    ADD R0, R2, R3
+    LSL R0, R0, #2     ; Total bytes needed
+
+    ; Allocate dynamic stack: SP = SP - R0
+    MOV R1, SP
+    SUB R1, R1, R0
+    MOV SP, R1         ; SP points to start of L
+
+    ; L starts at SP
+    ; R starts at SP + n1*4
+
+    ; Copy data to temp array L[]
+    MOV R5, #0      ; i = 0
 CopyL_Loop
-    CMP R8, R1      ; i < n1?
-    BGE CopyR_Setup ; if i >= n1, go to next part
-    ADD R9, R5, R8  ; p + i
-    LDR R10, [R7, R9, LSL #2] ; arr[p+i]
-    STR R10, [R3, R8, LSL #2] ; L[i] = arr[p+i]
-    ADD R8, R8, #1  ; i++
+    LDR R2, [R4, #-20] ; n1
+    CMP R5, R2
+    BGE CopyR_Setup
+
+    LDR R0, [R4, #-8] ; p
+    ADD R0, R0, R5    ; p+i
+    LSL R0, R0, #2    ; (p+i)*4
+    LDR R1, [R4, #12] ; base (R7 is at [R4, #12])
+    LDR R3, [R1, R0]  ; arr[p+i]
+
+    MOV R0, SP        ; L base
+    LSL R1, R5, #2    ; i*4
+    STR R3, [R0, R1]
+
+    ADD R5, R5, #1
     B CopyL_Loop
 
 CopyR_Setup
-    ; for (int j = 0; j < n2; j++) R[j] = arr[q + 1 + j];
-    MOV R8, #0      ; j = 0
+    MOV R6, #0      ; j = 0
 CopyR_Loop
-    CMP R8, R2      ; j < n2?
-    BGE Merge_Setup ; if j >= n2, go to merge
-    ADD R9, R0, #1  ; q + 1
-    ADD R9, R9, R8  ; q + 1 + j
-    LDR R10, [R7, R9, LSL #2] ; arr[q+1+j]
-    STR R10, [R4, R8, LSL #2] ; R[j] = arr[q+1+j]
-    ADD R8, R8, #1  ; j++
+    LDR R2, [R4, #-16] ; n2
+    CMP R6, R2
+    BGE Merge_Setup
+
+    LDR R0, [R4, #-12] ; q
+    ADD R0, R0, #1
+    ADD R0, R0, R6    ; q+1+j
+    LSL R0, R0, #2
+    LDR R1, [R4, #12] ; base
+    LDR R3, [R1, R0]  ; arr[q+1+j]
+
+    ; R base = SP + n1*4
+    LDR R0, [R4, #-20] ; n1
+    LSL R0, R0, #2     ; n1*4
+    ADD R0, R0, SP     ; R base
+    LSL R1, R6, #2     ; j*4
+    STR R3, [R0, R1]
+
+    ADD R6, R6, #1
     B CopyR_Loop
 
 Merge_Setup
-    ; Merge the temp arrays back into arr[p..r]
-    MOV R8, #0      ; i = 0
-    MOV R9, #0      ; j = 0
-    MOV R10, R5     ; k = p
+    MOV R5, #0      ; i = 0
+    MOV R6, #0      ; j = 0
+    LDR R7, [R4, #-8] ; k = p (Use R7 as k, we can reload base later)
+
 Merge_Loop
-    CMP R8, R1      ; i < n1?
-    BGE CopyRemR    ; if i >= n1, copy remaining of R
-    CMP R9, R2      ; j < n2?
-    BGE CopyRemL    ; if j >= n2, copy remaining of L
+    LDR R0, [R4, #-20] ; n1
+    CMP R5, R0
+    BGE CopyRemR
 
-    LDR R11, [R3, R8, LSL #2] ; L[i]
-    LDR R12, [R4, R9, LSL #2] ; R[j]
+    LDR R0, [R4, #-16] ; n2
+    CMP R6, R0
+    BGE CopyRemL
 
-    CMP R11, R12    ; L[i] <= R[j]?
-    BGT Else_Merge  ; if L[i] > R[j], go to else
-    ; if (L[i] <= R[j])
-    STR R11, [R7, R10, LSL #2] ; arr[k] = L[i]
-    ADD R8, R8, #1  ; i++
+    ; Load L[i]
+    MOV R0, SP
+    LSL R1, R5, #2
+    LDR R2, [R0, R1]
+
+    ; Load R[j]
+    LDR R0, [R4, #-20] ; n1
+    LSL R0, R0, #2
+    ADD R0, R0, SP     ; R base
+    LSL R1, R6, #2
+    LDR R3, [R0, R1]
+
+    CMP R2, R3
+    BGT Else_Merge
+
+    LDR R0, [R4, #12] ; base
+    LSL R1, R7, #2
+    STR R2, [R0, R1]
+    ADD R5, R5, #1
     B After_If_Else
+
 Else_Merge
-    STR R12, [R7, R10, LSL #2] ; arr[k] = R[j]
-    ADD R9, R9, #1  ; j++
+    LDR R0, [R4, #12] ; base
+    LSL R1, R7, #2
+    STR R3, [R0, R1]
+    ADD R6, R6, #1
+
 After_If_Else
-    ADD R10, R10, #1 ; k++
+    ADD R7, R7, #1
     B Merge_Loop
 
 CopyRemL
-    ; Copy remaining elements of L[]
-    CMP R8, R1      ; i < n1?
-    BGE Merge_Cleanup ; if i >= n1, we are done
-    LDR R11, [R3, R8, LSL #2] ; L[i]
-    STR R11, [R7, R10, LSL #2] ; arr[k] = L[i]
-    ADD R8, R8, #1  ; i++
-    ADD R10, R10, #1 ; k++
+    LDR R0, [R4, #-20] ; n1
+    CMP R5, R0
+    BGE Merge_Cleanup
+
+    MOV R0, SP
+    LSL R1, R5, #2
+    LDR R2, [R0, R1]
+
+    LDR R0, [R4, #12] ; base
+    LSL R1, R7, #2
+    STR R2, [R0, R1]
+
+    ADD R5, R5, #1
+    ADD R7, R7, #1
     B CopyRemL
 
 CopyRemR
-    ; Copy remaining elements of R[]
-    CMP R9, R2      ; j < n2?
-    BGE Merge_Cleanup ; if j >= n2, we are done
-    LDR R12, [R4, R9, LSL #2] ; R[j]
-    STR R12, [R7, R10, LSL #2] ; arr[k] = R[j]
-    ADD R9, R9, #1  ; j++
-    ADD R10, R10, #1 ; k++
+    LDR R0, [R4, #-16] ; n2
+    CMP R6, R0
+    BGE Merge_Cleanup
+
+    LDR R0, [R4, #-20] ; n1
+    LSL R0, R0, #2
+    ADD R0, R0, SP     ; R base
+    LSL R1, R6, #2
+    LDR R3, [R0, R1]
+
+    LDR R0, [R4, #12] ; base
+    LSL R1, R7, #2
+    STR R3, [R0, R1]
+
+    ADD R6, R6, #1
+    ADD R7, R7, #1
     B CopyRemR
 
 Merge_Cleanup
-    ADD SP, SP, #40 ; Deallocate temp arrays L and R
-    POP {R0-R4}     ; Restore registers
-    POP {LR}        ; Restore link register
-    BX LR           ; Return
+    MOV SP, R4      ; Restore SP to initial state (deallocates everything)
+    POP {R4-R7, PC}
 
         END

@@ -79,98 +79,161 @@ MergeSort_End
 my_Merge PROC
         ; my_Merge(p in R0, q in R2, r in R1)
         ; R7 is array base address
-        PUSH {R0-R6, LR} ; Save registers
+        PUSH {R4-R7, LR} ; Save registers
 
-        ; n1 = q - p + 1
-        SUB R3, R2, R0
-        ADD R3, R3, #1  ; R3 = n1
+        ; Allocate stack
+        ; Locals: p(4), q(4), r(4), n1(4), n2(4), padding(8), base(4) -> 32 bytes
+        ; L array: 4 words -> 16 bytes
+        ; R array: 4 words -> 16 bytes
+        ; Total: 64 bytes
+        SUB SP, SP, #64
 
-        ; n2 = r - q
-        SUB R4, R1, R2  ; R4 = n2
+        ; Copy inputs to local frame
+        ; Saved R4-R7, LR are at SP+64
+        ; R0 (p), R1 (r), R2 (q) are in registers.
+        ; R7 (base) is at SP+64+12 = SP+76.
 
-        ; Allocate space for two temporary arrays, L and R, on the stack.
-        ; Total space needed is (n1+n2)*4 bytes. Max is 8*4=32
-        SUB SP, SP, #32 ; Allocate space for temp buffer
-        MOV R5, SP      ; R5 = base address of L
-        ADD R6, SP, #16 ; R6 = base address of R (assuming max n1=4)
+        STR R0, [SP, #32] ; Store p
+        STR R2, [SP, #36] ; Store q
+        STR R1, [SP, #40] ; Store r
+        LDR R3, [SP, #76] ; Load base from saved regs
+        STR R3, [SP, #60] ; Store base locally
 
-        ; Copy data to temp array L
-        ; for (i = 0; i < n1; i++) L[i] = arr[p + i];
-        MOV R8, #0      ; i = 0
+        ; Calculate n1 = q - p + 1
+        LDR R0, [SP, #36] ; q
+        LDR R1, [SP, #32] ; p
+        SUB R3, R0, R1
+        ADD R3, R3, #1
+        STR R3, [SP, #44] ; n1
+
+        ; Calculate n2 = r - q
+        LDR R0, [SP, #40] ; r
+        LDR R1, [SP, #36] ; q
+        SUB R3, R0, R1
+        STR R3, [SP, #48] ; n2
+
+        ; Copy data to temp array L[]
+        MOV R4, #0      ; i = 0
 CopyL_Loop
-        CMP R8, R3      ; i < n1?
+        LDR R3, [SP, #44] ; n1
+        CMP R4, R3
         BGE CopyR_Setup
-        ADD R9, R0, R8  ; p + i
-        LDR R10, [R7, R9, LSL #2] ; arr[p+i]
-        STR R10, [R5, R8, LSL #2] ; L[i] = arr[p+i]
-        ADD R8, R8, #1
+
+        LDR R0, [SP, #32] ; p
+        ADD R0, R0, R4    ; p+i
+        LSL R0, R0, #2    ; (p+i)*4
+        LDR R1, [SP, #60] ; base
+        LDR R5, [R1, R0]  ; arr[p+i]
+
+        MOV R0, SP
+        ADD R0, R0, #16   ; L base (at SP+16)
+        LSL R1, R4, #2    ; i*4
+        STR R5, [R0, R1]
+
+        ADD R4, R4, #1
         B CopyL_Loop
 
 CopyR_Setup
-        ; Copy data to temp array R
-        ; for (j = 0; j < n2; j++) R[j] = arr[q + 1 + j];
-        MOV R8, #0      ; j = 0
+        MOV R5, #0      ; j = 0
 CopyR_Loop
-        CMP R8, R4      ; j < n2?
+        LDR R3, [SP, #48] ; n2
+        CMP R5, R3
         BGE Merge_Setup
-        ADD R9, R2, #1  ; q + 1
-        ADD R9, R9, R8  ; q + 1 + j
-        LDR R10, [R7, R9, LSL #2] ; arr[q+1+j]
-        STR R10, [R6, R8, LSL #2] ; R[j] = arr[q+1+j]
-        ADD R8, R8, #1
+
+        LDR R0, [SP, #36] ; q
+        ADD R0, R0, #1
+        ADD R0, R0, R5    ; q+1+j
+        LSL R0, R0, #2
+        LDR R1, [SP, #60] ; base
+        LDR R6, [R1, R0]  ; arr[q+1+j]
+
+        MOV R0, SP        ; R base (at SP+0)
+        LSL R1, R5, #2
+        STR R6, [R0, R1]
+
+        ADD R5, R5, #1
         B CopyR_Loop
 
 Merge_Setup
-        ; Merge the temp arrays back into arr[p..r]
-        MOV R8, #0      ; i = 0 (L index)
-        MOV R9, #0      ; j = 0 (R index)
-        MOV R10, R0     ; k = p (main array index)
+        MOV R4, #0      ; i = 0
+        MOV R5, #0      ; j = 0
+        LDR R6, [SP, #32] ; k = p
+
 Merge_Loop
-        CMP R8, R3      ; i >= n1?
-        BGE CopyRemR    ; If so, copy remaining of R
-        CMP R9, R4      ; j >= n2?
-        BGE CopyRemL    ; If so, copy remaining of L
+        LDR R0, [SP, #44] ; n1
+        CMP R4, R0
+        BGE CopyRemR
 
-        LDR R11, [R5, R8, LSL #2] ; L[i]
-        LDR R12, [R6, R9, LSL #2] ; R[j]
+        LDR R0, [SP, #48] ; n2
+        CMP R5, R0
+        BGE CopyRemL
 
-        CMP R11, R12
+        MOV R0, SP
+        ADD R0, R0, #16
+        LSL R1, R4, #2
+        LDR R2, [R0, R1] ; L[i]
+
+        MOV R0, SP
+        LSL R1, R5, #2
+        LDR R3, [R0, R1] ; R[j]
+
+        CMP R2, R3
         BGT Else_Merge
-        ; if (L[i] <= R[j])
-        STR R11, [R7, R10, LSL #2] ; arr[k] = L[i]
-        ADD R8, R8, #1  ; i++
+
+        LDR R0, [SP, #60] ; base
+        LSL R1, R6, #2
+        STR R2, [R0, R1]
+        ADD R4, R4, #1
         B After_If_Else
+
 Else_Merge
-        STR R12, [R7, R10, LSL #2] ; arr[k] = R[j]
-        ADD R9, R9, #1  ; j++
+        LDR R0, [SP, #60] ; base
+        LSL R1, R6, #2
+        STR R3, [R0, R1]
+        ADD R5, R5, #1
+
 After_If_Else
-        ADD R10, R10, #1 ; k++
+        ADD R6, R6, #1
         B Merge_Loop
 
 CopyRemL
-        ; Copy remaining elements of L[] if any
-        CMP R8, R3
+        LDR R0, [SP, #44] ; n1
+        CMP R4, R0
         BGE Merge_Cleanup
-        LDR R11, [R5, R8, LSL #2]
-        STR R11, [R7, R10, LSL #2]
-        ADD R8, R8, #1
-        ADD R10, R10, #1
+
+        MOV R0, SP
+        ADD R0, R0, #16
+        LSL R1, R4, #2
+        LDR R2, [R0, R1]
+
+        LDR R0, [SP, #60] ; base
+        LSL R1, R6, #2
+        STR R2, [R0, R1]
+
+        ADD R4, R4, #1
+        ADD R6, R6, #1
         B CopyRemL
 
 CopyRemR
-        ; Copy remaining elements of R[] if any
-        CMP R9, R4
+        LDR R0, [SP, #48] ; n2
+        CMP R5, R0
         BGE Merge_Cleanup
-        LDR R12, [R6, R9, LSL #2]
-        STR R12, [R7, R10, LSL #2]
-        ADD R9, R9, #1
-        ADD R10, R10, #1
+
+        MOV R0, SP
+        LSL R1, R5, #2
+        LDR R3, [R0, R1]
+
+        LDR R0, [SP, #60] ; base
+        LSL R1, R6, #2
+        STR R3, [R0, R1]
+
+        ADD R5, R5, #1
+        ADD R6, R6, #1
         B CopyRemR
 
 Merge_Cleanup
-        ADD SP, SP, #32 ; Deallocate temp arrays
-        POP {R0-R6, LR} ; Restore registers
-        BX LR           ; Return
+        ADD SP, SP, #64
+        POP {R4-R7, PC}
         ENDP
 
         AREA    MyData, DATA, READWRITE
