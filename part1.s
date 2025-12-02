@@ -254,18 +254,22 @@ CopyRemL
     B CopyRemL
 
 CopyRemR
-    LDR R0, [R4, #-16] ; n2
+    MOVS R0, R4
+    SUBS R0, #16
+    LDR R0, [R0] ; n2
     CMP R6, R0
     BGE Merge_Cleanup
 
-    LDR R0, [R4, #-20] ; n1
-    LSL R0, R0, #2
-    ADD R0, R0, SP     ; R base
-    LSL R1, R6, #2
+    MOVS R0, R4
+    SUBS R0, #20
+    LDR R0, [R0] ; n1
+    LSLS R0, R0, #2
+    ADD R0, SP     ; R base
+    LSLS R1, R6, #2
     LDR R3, [R0, R1]
 
     LDR R0, [R4, #12] ; base
-    LSL R1, R7, #2
+    LSLS R1, R7, #2
     STR R3, [R0, R1]
 
     ADDS R6, R6, #1
