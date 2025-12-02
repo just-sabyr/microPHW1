@@ -47,7 +47,8 @@ my_MergeSort PROC
     BGE MergeSort_End ; if p >= r, return
 
     ; Calculate mid q = (p+r)/2
-    ADD R0, R5, R6  ; p + r
+    MOV R0, R5
+    ADDS R0, R0, R6  ; p + r
     LSR R0, R0, #1  ; (p + r) / 2. R0 is now q.
 
     ; Recursive call: my_MergeSort(arr, p, q)
@@ -59,7 +60,8 @@ my_MergeSort PROC
 
     ; Recursive call: my_MergeSort(arr, q+1, r)
     ; R6 is r. R5 needs to be q+1.
-    ADD R5, R0, #1  ; p = q + 1
+    MOV R5, R0
+    ADDS R5, R5, #1  ; p = q + 1
     BL my_MergeSort
 
     ; Call my_Merge(arr, p, q, r)
@@ -91,7 +93,7 @@ my_Merge PROC
     LDR R0, [R4, #-12] ; q
     LDR R1, [R4, #-8]  ; p
     SUB R2, R0, R1
-    ADD R2, R2, #1     ; n1
+    ADDS R2, R2, #1     ; n1
 
     ; Calculate n2 = r - q
     LDR R0, [R4, #-4]  ; r
@@ -105,7 +107,8 @@ my_Merge PROC
     PUSH {R2, R3}
 
     ; Calculate size for L and R arrays: (n1 + n2) * 4
-    ADD R0, R2, R3
+    MOV R0, R2
+    ADDS R0, R0, R3
     LSL R0, R0, #2     ; Total bytes needed
 
     ; Allocate dynamic stack: SP = SP - R0
@@ -124,7 +127,7 @@ CopyL_Loop
     BGE CopyR_Setup
 
     LDR R0, [R4, #-8] ; p
-    ADD R0, R0, R5    ; p+i
+    ADDS R0, R0, R5    ; p+i
     LSL R0, R0, #2    ; (p+i)*4
     LDR R1, [R4, #12] ; base (R7 is at [R4, #12])
     LDR R3, [R1, R0]  ; arr[p+i]
@@ -133,7 +136,7 @@ CopyL_Loop
     LSL R1, R5, #2    ; i*4
     STR R3, [R0, R1]
 
-    ADD R5, R5, #1
+    ADDS R5, R5, #1
     B CopyL_Loop
 
 CopyR_Setup
@@ -144,8 +147,8 @@ CopyR_Loop
     BGE Merge_Setup
 
     LDR R0, [R4, #-12] ; q
-    ADD R0, R0, #1
-    ADD R0, R0, R6    ; q+1+j
+    ADDS R0, R0, #1
+    ADDS R0, R0, R6    ; q+1+j
     LSL R0, R0, #2
     LDR R1, [R4, #12] ; base
     LDR R3, [R1, R0]  ; arr[q+1+j]
@@ -157,7 +160,7 @@ CopyR_Loop
     LSL R1, R6, #2     ; j*4
     STR R3, [R0, R1]
 
-    ADD R6, R6, #1
+    ADDS R6, R6, #1
     B CopyR_Loop
 
 Merge_Setup
@@ -192,17 +195,17 @@ Merge_Loop
     LDR R0, [R4, #12] ; base
     LSL R1, R7, #2
     STR R2, [R0, R1]
-    ADD R5, R5, #1
+    ADDS R5, R5, #1
     B After_If_Else
 
 Else_Merge
     LDR R0, [R4, #12] ; base
     LSL R1, R7, #2
     STR R3, [R0, R1]
-    ADD R6, R6, #1
+    ADDS R6, R6, #1
 
 After_If_Else
-    ADD R7, R7, #1
+    ADDS R7, R7, #1
     B Merge_Loop
 
 CopyRemL
@@ -218,8 +221,8 @@ CopyRemL
     LSL R1, R7, #2
     STR R2, [R0, R1]
 
-    ADD R5, R5, #1
-    ADD R7, R7, #1
+    ADDS R5, R5, #1
+    ADDS R7, R7, #1
     B CopyRemL
 
 CopyRemR
@@ -237,8 +240,8 @@ CopyRemR
     LSL R1, R7, #2
     STR R3, [R0, R1]
 
-    ADD R6, R6, #1
-    ADD R7, R7, #1
+    ADDS R6, R6, #1
+    ADDS R7, R7, #1
     B CopyRemR
 
 Merge_Cleanup
