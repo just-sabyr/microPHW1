@@ -1,6 +1,7 @@
-	AREA    MergeSort_M0, CODE, READONLY
+AREA    MergeSort_M0, CODE, READONLY
         THUMB
         ENTRY
+        ALIGN
         EXPORT  main
         EXPORT  my_MergeSort
         EXPORT  my_Merge
@@ -72,8 +73,7 @@ my_MergeSort PROC
 
     POP {R5, R6}    ; Restore p and r
 MergeSort_End
-    POP {LR}        ; Restore link register
-    BX LR           ; Return
+    POP {PC}        ; Restore link register and return
     ENDP
 
 my_Merge PROC
@@ -141,7 +141,7 @@ CopyL_Loop
     LDR R0, [R0] ; p
     ADDS R0, R0, R5    ; p+i
     LSLS R0, R0, #2    ; (p+i)*4
-    LDR R1, [R4, #12] ; base (R7 is at [R4, #12])
+    LDR R1, [R4, #16] ; base (R7 is at [R4, #16] after pushing R4-R7, LR)
     LDR R3, [R1, R0]  ; arr[p+i]
 
     MOV R0, SP        ; L base
@@ -166,7 +166,7 @@ CopyR_Loop
     ADDS R0, R0, #1
     ADDS R0, R0, R6    ; q+1+j
     LSLS R0, R0, #2
-    LDR R1, [R4, #12] ; base
+    LDR R1, [R4, #16] ; base
     LDR R3, [R1, R0]  ; arr[q+1+j]
 
     ; R base = SP + n1*4
@@ -174,7 +174,7 @@ CopyR_Loop
     SUBS R0, #20
     LDR R0, [R0] ; n1
     LSLS R0, R0, #2     ; n1*4
-    ADD R0, SP     ; R base
+    ADD R0, R0, SP     ; R base
     LSLS R1, R6, #2     ; j*4
     STR R3, [R0, R1]
 
@@ -211,21 +211,21 @@ Merge_Loop
     SUBS R0, #20
     LDR R0, [R0] ; n1
     LSLS R0, R0, #2
-    ADD R0, SP     ; R base
+    ADD R0, R0, SP     ; R base
     LSLS R1, R6, #2
     LDR R3, [R0, R1]
 
     CMP R2, R3
     BGT Else_Merge
 
-    LDR R0, [R4, #12] ; base
+    LDR R0, [R4, #16] ; base
     LSLS R1, R7, #2
     STR R2, [R0, R1]
     ADDS R5, R5, #1
     B After_If_Else
 
 Else_Merge
-    LDR R0, [R4, #12] ; base
+    LDR R0, [R4, #16] ; base
     LSLS R1, R7, #2
     STR R3, [R0, R1]
     ADDS R6, R6, #1
@@ -245,7 +245,7 @@ CopyRemL
     LSLS R1, R5, #2
     LDR R2, [R0, R1]
 
-    LDR R0, [R4, #12] ; base
+    LDR R0, [R4, #16] ; base
     LSLS R1, R7, #2
     STR R2, [R0, R1]
 
@@ -264,11 +264,11 @@ CopyRemR
     SUBS R0, #20
     LDR R0, [R0] ; n1
     LSLS R0, R0, #2
-    ADD R0, SP     ; R base
+    ADD R0, R0, SP     ; R base
     LSLS R1, R6, #2
     LDR R3, [R0, R1]
 
-    LDR R0, [R4, #12] ; base
+    LDR R0, [R4, #16] ; base
     LSLS R1, R7, #2
     STR R3, [R0, R1]
 
@@ -277,7 +277,23 @@ CopyRemR
     B CopyRemR
 
 Merge_Cleanup
-    MOV SP, R4      ; Restore SP to initial state (deallocates everything)
+    ; Deallocate L and R arrays
+    MOVS R0, R4
+    SUBS R0, #20
+    LDR R0, [R0] ; n1
+    MOVS R1, R4
+    SUBS R1, #16
+    LDR R1, [R1] ; n2
+    ADDS R0, R0, R1
+    LSLS R0, R0, #2
+    ADD SP, SP, R0
+
+    ; Deallocate n1, n2
+    ADD SP, SP, #8
+
+    ; Deallocate p, q, r
+    ADD SP, SP, #12
+
     POP {R4-R7, PC}
 
         END

@@ -74,8 +74,8 @@ my_MergeSort PROC
         BL my_Merge
 
 MergeSort_End
-        POP {R0, R1, R4-R6, LR} ; Restore registers
-        BX LR           ; Return
+        POP {R0, R1, R4-R6}
+        POP {PC} ; Restore registers and return
         ENDP
 
 my_Merge PROC
