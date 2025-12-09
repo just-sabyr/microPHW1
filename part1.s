@@ -2,208 +2,311 @@
         THUMB
         ENTRY
         ALIGN
+        
         EXPORT  main
         EXPORT  my_MergeSort
         EXPORT  my_Merge
 
-; Main entry point
-; Input: R0-R4 contain unsorted values
-; Output: R0-R4 contain sorted values
+											; Main entry point
+											; Input: R0-R4 contain unsorted values
+											; Output: R0-R4 contain sorted values
 main    PROC
-        ; Push callee-saved registers
-        PUSH    {R4-R7, LR}
-        
-        ; Allocate space on stack for array (5 elements + temp space)
-        ; We need: original array (5), left half (3), right half (2), merged (5) = 15 bytes
-        SUBS    SP, SP, #20
-        
-        ; Save input values to stack
-        MOVS    R4, SP          ; R4 = base pointer to array
-        STRB    R0, [R4, #0]    ; array[0] = R0 (38)
-        STRB    R1, [R4, #1]    ; array[1] = R1 (27)
-        STRB    R2, [R4, #2]    ; array[2] = R2 (43)
-        STRB    R3, [R4, #3]    ; array[3] = R3 (10)
-        STRB    R3, [R4, #4]    ; Temp: save R3 for R4
-        LDRB    R0, [SP, #20]   ; Load R4 from original stack (offset by 20)
-        STRB    R0, [R4, #4]    ; array[4] = R4 (55)
-        
-        ; Call merge sort
-        MOVS    R0, R4          ; R0 = array pointer
-        MOVS    R1, #0          ; R1 = left index (0)
-        MOVS    R2, #4          ; R2 = right index (4)
-        BL      my_MergeSort
-        
-        ; Load sorted values back to R0-R4
-        LDRB    R0, [R4, #0]
-        LDRB    R1, [R4, #1]
-        LDRB    R2, [R4, #2]
-        LDRB    R3, [R4, #3]
-        LDRB    R4, [R4, #4]
-        
-        ; Deallocate stack
-        ADDS    SP, SP, #20
-        
-        ; Pop registers and return
-        POP     {R4-R7, PC}
+
+	; ======================================
+	;	Input AREA
+	; ======================================
+											; Assign input here
+	LDR 	R0, 	#38
+	LDR 	R1,		#27
+	LDR 	R2, 	#43
+	LDR 	R3,		#10
+	LDR 	R4,		#55
+	
+	
+	; ======================================	
+	;	Load input to arr
+	; ======================================
+	LDR 	R5, 	=arr					; arr address can be passed using R5
+	STM 	R5!,	{R0-R4}					; Writeback suffix: 		R5 = R4 (compulsory)
+
+
+	; ======================================	
+	;	Sorting	
+	; ======================================
+	LDR 	R0, 	#0						; R0 = 0 First Call to Recursive Mergesort, parameter setup; left
+	LDR		R1,		#16						; R1 = 4												   ; right
+	LDR 	R2,		#8						; R2 is 												   ; mid
+	
+	BLX		MergeSort						; LR = next line, PC = MergeSort; CALL MergeSort
+	
+	LDR		R0,		=arr
+	LDR		R1, 	=arr+4
+	LDR 	R2,		=arr+8
+	LDR		R3,		=arr+12
+	LDR		R4,		=arr+16
+
         ENDP
+     
+     
+; ======================================	
+; MergeSort Function
+;	R0: 	left
+;	R1:		right
+; ======================================   
+MergeSort
+	CMP		R0,		R1						; left >= right
+	BGT		MergeSort_Continue
+	B		Mergesort_End
 
-; Recursive Merge Sort
-; R0 = array pointer
-; R1 = left index
-; R2 = right index
-; Uses stack for temporary storage
-my_MergeSort PROC
-        PUSH    {R4-R7, LR}
-        
-        ; Base case: if left >= right, return
-        CMP     R1, R2
-        BCS     merge_sort_return
-        
-        ; Calculate mid = (left + right) / 2
-        MOVS    R3, R1
-        ADDS    R3, R2
-        LSRS    R3, #1          ; R3 = mid
-        
-        ; Save left and right for later
-        MOVS    R4, R1          ; R4 = left
-        MOVS    R5, R2          ; R5 = right
-        MOVS    R6, R0          ; R6 = array pointer
-        MOVS    R7, R3          ; R7 = mid
-        
-        ; Sort left half: my_MergeSort(array, left, mid)
-        MOVS    R1, R4
-        MOVS    R2, R7
-        BL      my_MergeSort
-        
-        ; Sort right half: my_MergeSort(array, mid+1, right)
-        MOVS    R0, R6
-        MOVS    R1, R7
-        ADDS    R1, #1
-        MOVS    R2, R5
-        BL      my_MergeSort
-        
-        ; Merge: my_Merge(array, left, mid, right)
-        MOVS    R0, R6
-        MOVS    R1, R4
-        MOVS    R2, R7
-        MOVS    R3, R5
-        BL      my_Merge
-        
-merge_sort_return
-        POP     {R4-R7, PC}
-        ENDP
 
-; Merge function
-; R0 = array pointer
-; R1 = left index
-; R2 = mid index
-; R3 = right index
-my_Merge PROC
-        PUSH    {R4-R7, LR}
-        SUBS    SP, SP, #10     ; Temporary space for merged array
-        
-        MOVS    R4, R0          ; R4 = array pointer
-        MOVS    R5, R1          ; R5 = left index
-        MOVS    R6, R2          ; R6 = mid index
-        MOVS    R7, R3          ; R7 = right index
-        
-        ; R0 will track merged array index
-        ; Create temp array on stack
-        MOVS    R0, SP          ; R0 = temp array pointer
-        
-        ; Initialize left_idx = left, right_idx = mid+1
-        MOVS    R1, R5          ; R1 = left_idx
-        MOVS    R2, R6
-        ADDS    R2, #1          ; R2 = right_idx (mid+1)
-        MOVS    R3, #0          ; R3 = merged index
-        
-merge_loop
-        ; Check if left half is exhausted
-        CMP     R1, R6
-        BHI     copy_right_half
-        
-        ; Check if right half is exhausted
-        CMP     R2, R7
-        BHI     copy_left_half
-        
-        ; Compare array[left_idx] and array[right_idx]
-        LDRB    R4, [R4, R1]    ; Load array[left_idx]
-        LDRB    R5, [R4, R2]    ; Load array[right_idx]
-        
-        MOV     R4, #0
-        LDRB    R4, [SP, #12]   ; Reload R4 (array pointer from stack save)
-        LDRB    R5, [R4, R1]    ; array[left_idx]
-        LDRB    R6, [R4, R2]    ; array[right_idx]
-        
-        CMP     R5, R6
-        BLS     merge_take_left
-        
-        ; Take from right
-        STRB    R6, [R0, R3]    ; temp[merged_idx] = array[right_idx]
-        ADDS    R2, #1          ; right_idx++
-        B       merge_next
-        
-merge_take_left
-        STRB    R5, [R0, R3]    ; temp[merged_idx] = array[left_idx]
-        ADDS    R1, #1          ; left_idx++
-        
-merge_next
-        ADDS    R3, #1          ; merged_idx++
-        B       merge_loop
-        
-copy_left_half
-        ; Copy remaining from left half
-        CMP     R1, R6
-        BHI     copy_right_half
-        LDRB    R4, [R4, R1]
-        MOVS    R4, #0
-        LDRB    R4, [SP, #12]
-        LDRB    R5, [R4, R1]
-        STRB    R5, [R0, R3]
-        ADDS    R1, #1
-        ADDS    R3, #1
-        B       copy_left_half
-        
-copy_right_half
-        ; Copy remaining from right half
-        CMP     R2, R7
-        BHI     copy_done
-        MOVS    R4, #0
-        LDRB    R4, [SP, #12]
-        LDRB    R5, [R4, R2]
-        STRB    R5, [R0, R3]
-        ADDS    R2, #1
-        ADDS    R3, #1
-        B       copy_right_half
-        
-copy_done
-        ; Copy temp array back to original array
-        MOVS    R0, SP          ; R0 = temp array pointer
-        MOVS    R4, #0
-        LDRB    R4, [SP, #12]   ; R4 = original array pointer
-        MOVS    R1, #0          ; index = 0
-        MOVS    R3, #0          ; merged_idx = 0
-        
-copy_back_loop
-        CMP     R1, R7
-        BHI     merge_done
-        LDRB    R2, [R0, R3]
-        STRB    R2, [R4, R1]
-        ADDS    R1, #1
-        ADDS    R3, #1
-        B       copy_back_loop
-        
-merge_done
-        ADDS    SP, SP, #10
-        POP     {R4-R7, PC}
-        ENDP
+	; ======================================	
+	;	End of MergeSort
+	;	Post Process and return to the caller
+	; ======================================
+MergeSort_End
+	BLX		LR
+	
+	
+	; ======================================	
+	;	Continue part of MergeSort
+	;	Post Process and return to the caller
+	; ======================================
 
-stop    B       stop         ; Breakpoint to inspect sorted values
-        END
+MergeSort_Continue
+	PUSH {LR}					; 
+	PUSH {R0, R1, R2}			; Save current values of parameters; left, right, mid
+	
+	; Calculate mid
+	SUBS R2, R1, R0							; mid = right - left
+	ASRS R2, R2, #4							; mid = mid / 2
+	ADDS R2, R2, R0							; mid = mid + left
+	
+	; Call MergeSort(left, mid)
+	MOVS R1, R2								; right = mid
+	BLX MergeSort							; 
+	
+	; Call MergeSort(mid+1, right)			
+	POP {R0, R1, R2}						; Restore the parameters
+	PUSH {R0, R1, R2}						; Save current values of parameters; left, right, mid
+	ADDS R0, R2, #4							; Calculate mid+1 and save it to left
+	BLX MergeSort							; 
+	
+	; Call Merge(arr, left, mid, right)		;
+	POP {R0, R1, R2}						; Restore the parameters
+	BLX Merge	
+	
 
-; Data area for array storage
-    AREA    MergeSort_Data, DATA, READWRITE
-        ALIGN
-array   SPACE   5             ; Space for 5 unsorted bytes
-sorted  SPACE   5             ; Space for 5 sorted bytes
-        END
+	POP {PC}								; Return to the caller, maybe MergeSort, maybe main
+        
+        
+
+; ======================================	
+;	Merge Function
+;	R0 left
+; 	R1 right
+; 	R2 mid 
+
+; 	R4 i
+; 	R5 j
+; 	R6 k
+
+; R3 and R7 can be changed, the other registers are fixed
+; 	R3			arr[i]
+;   R7 			arr[k]
+; 	also temp values, need to be loaded before using
+
+; ======================================
+Merge	
+	LDR R4, R0								; i = left
+	ADDS R5, R2, #4							; j = mid+1
+	LDR R6, R0								; k = left
+
+Compare_Merge	
+	; ======================================	
+	;   // Merge both subarrays into temp
+    ;	while (i <= mid && j <= right) {
+    ;		if (arr[i] <= arr[j]) {
+    ;			temp[k++] = arr[i++];
+    ;   	} else {
+    ;       	temp[k++] = arr[j++];
+    ;   	}
+    ;	}
+	; ======================================	
+
+	; while loop (i <= mid && j <= right)
+	CMP R4, R2								; i == mid
+	BGT Left_Merge							; JMP i > mid 
+	CMP R5, R1								; j == right
+	BGT Left_Merge							; JMP j > right
+
+	
+	; if conidition (arr[i] <= arr[j]) 
+	LDR R3, =arr							; pointer to start of arr
+	ADDS R3, R3, R4							; pointer to [start of arr + i]
+	LDR R3, [R3]							; load the value from flash memory
+	; by this line R3 = arr[i]
+	LDR R7, =arr							; pointer to start of arr
+	ADDS R7, R7, R5							; pointer to [start of arr + j]
+	LDR R7, [R7]
+	; by this line R7 = arr[j]
+	CMP R3, R7								; arr[i] == arr[j]
+	BGT Insert_From_Right					; arr[i] > arr[j]: temp[k++] = arr[j++]
+	B Insert_From_Left						; arr[i] <= arr[j]: temp[k++] = arr[i++]
+Insert_From_Right
+	LDR R3, =temp							; start of temp
+	ADDS R3, R3, R6							; address of temp[k]
+	STR R7, [R3]							; temp[k] = arr[j]
+	ADDS R6, R6, #4							; k++
+	ADDS R5, R5, #4							; j++
+	B Compare_Merge							; next iteration 
+Insert_From_Left
+	LDR R7, =temp							; pointer to start of temp
+	ADDS R7, R7, R6							; pointer to temp[k]
+	STR R3, [R7]							; store arr[i] to temp[k]
+	ADDS R6, R6, #4							; k++
+	ADDS R4, R4, #4							; i++
+	B Compare_Merge							; next iteration
+
+
+Left_Merge
+	; ======================================	
+	;	// Copy remaining elements from left subarray
+    ;	while (i <= mid) {
+    ;   	temp[k++] = arr[i++];
+    ;	}
+
+	; R3 address of temp[k]
+	; R7 value arr[i]
+	; ======================================	
+	CMP R4, R2								; i == mid
+	BGT Right_Merge							; i > mid: right merge
+	LDR R3, =temp							; pointer to start of arr
+	ADDS R3, R3, R6							; address of temp[k]
+	; by this line R3 = address of temp[k]
+	LDR R7, =arr							; pointer to start of arr
+	ADDS R7, R7, R4							; address of arr[i]
+	LDR R7, [R7]							; value at arr[i]
+	; by this line R7 = arr[i]
+	STR R7, [R3]							; store arr[i] to temp[k]
+	ADDS R6, R6, #4							; k++
+	ADDS R4, R4, #4							; i++
+	B Left_Merge							; next iteration
+
+Right_Merge
+	; ======================================	
+	;   // Copy remaining elements from right subarray
+    ;	while (j <= right) {
+    ;    	temp[k++] = arr[j++];
+    ;	}
+	; ======================================	
+
+	CMP R5, R1								; j == right
+	BGT Remaining_Merge						; j > right
+	LDR R3, =temp							; pointer to start of arr
+	ADDS R3, R3, R6							; address of temp[k]
+	; by this line R3 = address of temp[k]
+	LDR R7, =arr							; pointer to start of arr
+	ADDS R7, R7, R5							; address of arr[j]
+	LDR R7, [R7]							; value at arr[j]
+	; by this line R7 = arr[i]
+	STR R7, [R3]							; store arr[i] to temp[k]
+	ADDS R6, R6, #4							; k++
+	ADDS R5, R5, #4							; j++
+	B Right_Merge							; next iteration
+
+Remaining_Merge
+	; ======================================	
+	;	// Copy sorted elements back to original array
+    ;	for (i = left; i <= right; i++) {
+    ;   	arr[i] = temp[i];
+    ;	}
+	;
+	; this is the last section of our merge function, 
+	; so overriding left, mid and right is ok
+	;
+	;	R0 left
+	; 	R1 right
+	; 	R2 mid 
+
+	; 	R4 i
+	; 	R5 j
+	; 	R6 k
+	;
+	;
+	; ======================================	
+
+	LDR R3, =arr							; Address of arr
+	LDR R7, =temp							; address of temp
+	LDR R4, R0								; i (R4) = left
+	CMP R4, R1								; i == right
+	BGT	Merge_End							; i > right: end
+	LDR R5, R3								; address of arr
+	ADDS R5, R5, R4							; address of arr[i]
+	LDR R6, R7								; address of temp
+	ADDS R6, R6, R4							; address of temp[i]
+	LDR R6, [R6]							; value of temp[i]
+	STR R5, R6								; arr[i] = temp[i]
+	B Remaining_Merge						; next iteration
+
+Merge_End
+	BX LR
+
+
+
+
+
+; ======================================	
+;	Read write memory on Flash
+;	=arr:		R0
+;	=arr+4: 	R1
+;	...
+;	=arr+4*4:	R4 
+; ======================================
+	
+	AREA MergeSort_Data, DATA, READWRITE
+
+	ALIGN 4
+	arr		SPACE 20	; 5 elements, each four bytes	
+	temp 	SPACE 20	; temporary array for merging
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	

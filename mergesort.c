@@ -5,54 +5,36 @@ using namespace std;
 // Merges two subarrays of arr[].
 // First subarray is arr[left..mid]
 // Second subarray is arr[mid+1..right]
-void merge(vector<int>& arr, int left, 
-                     int mid, int right){
-                         
-    int n1 = mid - left + 1;
-    int n2 = right - mid;
-
-    // Create temp vectors
-    vector<int> L(n1), R(n2);
-
-    // Copy data to temp vectors L[] and R[]
-    for (int i = 0; i < n1; i++)
-        L[i] = arr[left + i];
-    for (int j = 0; j < n2; j++)
-        R[j] = arr[mid + 1 + j];
-
-    int i = 0, j = 0;
-    int k = left;
-
-    // Merge the temp vectors back 
-    // into arr[left..right]
-    while (i < n1 && j < n2) {
-        if (L[i] <= R[j]) {
-            arr[k] = L[i];
-            i++;
+void merge(vector<int>& arr, vector<int>& temp, int left, int mid, int right) {
+    int i = left;      // Start of left subarray
+    int j = mid + 1;   // Start of right subarray
+    int k = left;      // Position in temp array
+    
+    // Merge both subarrays into temp
+    while (i <= mid && j <= right) {
+        if (arr[i] <= arr[j]) {
+            temp[k++] = arr[i++];
+        } else {
+            temp[k++] = arr[j++];
         }
-        else {
-            arr[k] = R[j];
-            j++;
-        }
-        k++;
     }
-
-    // Copy the remaining elements of L[], 
-    // if there are any
-    while (i < n1) {
-        arr[k] = L[i];
-        i++;
-        k++;
+    
+    // Copy remaining elements from left subarray
+    while (i <= mid) {
+        temp[k++] = arr[i++];
     }
-
-    // Copy the remaining elements of R[], 
-    // if there are any
-    while (j < n2) {
-        arr[k] = R[j];
-        j++;
-        k++;
+    
+    // Copy remaining elements from right subarray
+    while (j <= right) {
+        temp[k++] = arr[j++];
+    }
+    
+    // Copy sorted elements back to original array
+    for (i = left; i <= right; i++) {
+        arr[i] = temp[i];
     }
 }
+
 
 // begin is for left index and end is right index
 // of the sub-array of arr to be sorted
@@ -80,3 +62,16 @@ int main(){
     
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
